@@ -1,0 +1,8 @@
+id=rshmod
+name=RshMod Zygisk (机型伪装)
+version=1.8.5
+versionCode=19
+author=RshMod
+description=Zygisk 版机型伪装/设备信息伪装模块 + Web 管理界面。支持全局与单独 APP 生效，仅伪装不修改真实设备，保留账号登录与设备信息获取。
+minMagisk=26300
+zygisk=true

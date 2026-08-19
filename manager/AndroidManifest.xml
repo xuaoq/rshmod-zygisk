@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.rshmod.manager"
+    android:versionName="1.0"
+    android:versionCode="1">
+
+    <!-- 管理端需要 root（已有 Magisk 环境）与网络（可选） -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:label="@string/app_name"
+        android:theme="@android:style/Theme.Material.Light"
+        android:allowBackup="true"
+        android:usesCleartextTraffic="true">
+
+        <!-- 管理界面 LAUNCHER -->
+        <activity android:name=".ManagerActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

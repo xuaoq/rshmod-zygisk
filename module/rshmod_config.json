@@ -1,0 +1,25 @@
+{
+  "global": true,
+  "scopes": [],
+  "props": {},
+  "ids": {},
+  "webview": {},
+  "wifi": {},
+  "bluetooth": {},
+  "drm": {},
+  "operator": {},
+  "geo": {},
+  "switch": {
+    "build_prop": true,
+    "android_id": true,
+    "imei": true,
+    "gsf": true,
+    "ads": true,
+    "webview": true,
+    "wifi": true,
+    "bluetooth": true,
+    "drm": true,
+    "operator": true,
+    "geo": true
+  }
+}

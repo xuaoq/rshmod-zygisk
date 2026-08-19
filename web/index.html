@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RshMod 机型伪装 · Web 管理</title>
+<style>
+:root{--bg:#0f1117;--card:#1a1d28;--line:#2a2e3d;--txt:#e6e8ef;--sub:#9aa0b4;
+--accent:#4f7cff;--ok:#3ddc97;--warn:#ffbe5c;--err:#ff6b6b;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:14px/1.6 -apple-system,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;
+background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+header h1{font-size:18px;font-weight:600;display:flex;align-items:center;gap:10px}
+.badge{font-size:12px;color:var(--accent);border:1px solid var(--accent);padding:2px 8px;border-radius:20px}
+.status{font-size:12px;color:var(--sub)}
+.wrap{max-width:1080px;margin:20px auto;padding:0 16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+.card h2{font-size:15px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.card h2 small{color:var(--sub);font-weight:400;font-size:12px}
+.row{display:flex;align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap}
+.row label{width:150px;color:var(--sub);font-size:13px}
+input[type=text],input[type=number],select{flex:1;min-width:120px;background:#12141d;border:1px solid var(--line);
+color:var(--txt);padding:7px 10px;border-radius:8px;outline:none;font-size:13px}
+input:focus,select:focus{border-color:var(--accent)}
+input[type=number]{max-width:130px}
+.switch{position:relative;width:42px;height:24px;flex:0 0 auto}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:#333;border-radius:24px;transition:.2s;cursor:pointer}
+.slider:before{content:"";position:absolute;width:18px;height:18px;border-radius:50%;left:3px;top:3px;background:#fff;transition:.2s}
+.switch input:checked+.slider{background:var(--accent)}
+.switch input:checked+.slider:before{transform:translateX(18px)}
+.actions{display:flex;gap:12px;margin:20px 0;flex-wrap:wrap;position:sticky;bottom:12px;background:var(--card);border:1px solid var(--line);padding:14px;border-radius:12px;z-index:5}
+button{cursor:pointer;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:500;transition:.15s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{filter:brightness(1.1)}
+.btn-ghost{background:transparent;color:var(--sub);border:1px solid var(--line)}
+.btn-ghost:hover{color:var(--txt)}
+.hidden{display:none}
+#toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#fff;color:#111;
+padding:10px 22px;border-radius:8px;font-weight:600;z-index:100;opacity:0;transition:.3s;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+#toast.show{opacity:1}
+.tab{display:flex;gap:4px;margin-bottom:18px;background:var(--card);padding:6px;border-radius:10px;border:1px solid var(--line);width:fit-content}
+.tab button{background:transparent;color:var(--sub);padding:8px 18px;border-radius:8px}
+.tab button.active{background:var(--accent);color:#fff}
+.sec{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
+.sec > .sec-title{font-size:13px;color:var(--sub);margin-bottom:8px}
+.info-line{font-size:12px;color:var(--sub);background:#12141d;border:1px solid var(--line);
+border-radius:8px;padding:12px;margin:10px 0;white-space:pre-wrap}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.row label{width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <h1>📱 RshMod <span class="badge">Zygisk</span></h1>
+  <div class="status" id="stat">加载中…</div>
+</header>
+
+<div class="wrap">
+  <div class="tab" id="tabs">
+    <button data-tab="build" class="active">设备属性</button>
+    <button data-tab="ids">标识符</button>
+    <button data-tab="net">网络/定位</button>
+    <button data-tab="scope">生效范围</button>
+    <button data-tab="info">设备信息</button>
+  </div>
+
+  <!-- 设备属性 -->
+  <section id="tab-build">
+    <div class="grid">
+      <div class="card">
+        <h2>Build / 基础属性 <small>SystemProperties</small></h2>
+        <div class="row"><label>制造商 Manufacturer</label><input type="text" data-k="ro.product.manufacturer"></div>
+        <div class="row"><label>品牌 Brand</label><input type="text" data-k="ro.product.brand"></div>
+        <div class="row"><label>型号 Model</label><input type="text" data-k="ro.product.model"></div>
+        <div class="row"><label>设备 Device</label><input type="text" data-k="ro.product.device"></div>
+        <div class="row"><label>主板 Board</label><input type="text" data-k="ro.product.board"></div>
+        <div class="row"><label>产品 Product</label><input type="text" data-k="ro.product.name"></div>
+        <div class="row"><label>硬件 Hardware</label><input type="text" data-k="ro.hardware"></div>
+        <div class="row"><label>版本指纹 ID</label><input type="text" data-k="ro.build.id"></div>
+      </div>
+      <div class="card">
+        <h2>构建版本 <small>Build.VERSION</small></h2>
+        <div class="row"><label>指纹 Fingerprint</label><input type="text" data-k="ro.build.fingerprint"></div>
+        <div class="row"><label>标签 Tags</label><input type="text" data-k="ro.build.tags"></div>
+        <div class="row"><label>类型 Type</label><input type="text" data-k="ro.build.type"></div>
+        <div class="row"><label>显示 Display</label><input type="text" data-k="ro.build.display.id"></div>
+        <div class="row"><label>基带 Baseband</label><input type="text" data-k="ro.baseband"></div>
+        <div class="row"><label>CPU ABI</label><input type="text" data-k="ro.product.cpu.abi" placeholder="arm64-v8a"></div>
+        <div class="sec"><div class="sec-title">分组开关</div>
+          <div class="row"><label>Build/属性伪装</label><span class="switch"><input type="checkbox" data-sw="build_prop"><span class="slider"></span></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 标识符 -->
+  <section id="tab-ids" class="hidden">
+    <div class="card">
+      <h2>设备标识符 <small>仅伪装返回，不修改系统</small></h2>
+      <div class="row"><label>Android ID</label><input type="text" data-id="android_id"></div>
+      <div class="row"><label>IMEI</label><input type="text" data-id="imei"></div>
+      <div class="row"><label>GSF ID</label><input type="text" data-id="gsf_id"></div>
+      <div class="row"><label>广告 ID</label><input type="text" data-id="advertising_id"></div>
+      <div class="row"><label>序列号 Serial</label><input type="text" data-id="serial"></div>
+      <div class="row"><label>SIM 卡活动 ID</label><input type="text" data-id="sim_serial"></div>
+      <div class="sec"><div class="sec-title">分组开关</div>
+        <div class="row"><label>Android ID</label><span class="switch"><input type="checkbox" data-sw="android_id"><span class="slider"></span></span></div>
+        <div class="row"><label>IMEI</label><span class="switch"><input type="checkbox" data-sw="imei"><span class="slider"></span></span></div>
+        <div class="row"><label>GSF</label><span class="switch"><input type="checkbox" data-sw="gsf"><span class="slider"></span></span></div>
+        <div class="row"><label>广告 ID</label><span class="switch"><input type="checkbox" data-sw="ads"><span class="slider"></span></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 网络/定位 -->
+  <section id="tab-net" class="hidden">
+    <div class="grid">
+      <div class="card">
+        <h2>WiFi 伪装</h2>
+        <div class="row"><label>SSID</label><input type="text" data-wifi="ssid"></div>
+        <div class="row"><label>BSSID</label><input type="text" data-wifi="bssid"></div>
+        <div class="row"><label>MAC</label><input type="text" data-wifi="mac"></div>
+        <div class="row"><span class="switch"><input type="checkbox" data-sw="wifi"><span class="slider"></span></span><label>WiFi 伪装</label></div>
+      </div>
+      <div class="card">
+        <h2>蓝牙 / 定位 / 运营商</h2>
+        <div class="row"><label>蓝牙名称</label><input type="text" data-bt="name"></div>
+        <div class="row"><label>蓝牙地址</label><input type="text" data-bt="address"></div>
+        <div class="row"><label>运营商</label><input type="text" data-op="carrier"></div>
+        <div class="row"><label>MCC</label><input type="text" data-op="mcc"></div>
+        <div class="row"><label>MNC</label><input type="text" data-op="mnc"></div>
+        <div class="row"><label>经度 Lon</label><input type="number" step="0.000001" data-geo="lon"></div>
+        <div class="row"><label>纬度 Lat</label><input type="number" step="0.000001" data-geo="lat"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 生效范围 -->
+  <section id="tab-scope" class="hidden">
+    <div class="card">
+      <h2>生效范围 <small>全局 / 指定应用</small></h2>
+      <div class="row">
+        <label>全局伪装</label>
+        <span class="switch"><input type="checkbox" id="global"><span class="slider"></span></span>
+        <small style="color:var(--sub)">开启后对所有 APP 生效；关闭后仅对下方列表生效</small>
+      </div>
+      <div class="row">
+        <label>指定包名</label>
+        <input type="text" id="scope-input" placeholder="com.example.app">
+        <button class="btn-ghost" onclick="addScope()">添加</button>
+      </div>
+      <div id="scope-list"></div>
+    </div>
+  </section>
+
+  <!-- 设备信息 -->
+  <section id="tab-info" class="hidden">
+    <div class="card">
+      <h2>真实设备信息 <button class="btn-ghost" onclick="loadInfo()">刷新</button></h2>
+      <div class="info-line" id="info-box">点击「刷新」获取真实设备信息（仅展示，不修改）</div>
+      <p style="color:var(--sub);font-size:12px">用于确认当前真实设备参数，作为伪装的参考。账号登录与设备信息获取使用真实采集值。</p>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="btn-ghost" onclick="loadConfig()">载入配置</button>
+    <button class="btn-primary" onclick="saveConfig()">保存并应用</button>
+    <span id="save-hint" style="align-self:center;color:var(--sub);font-size:12px"></span>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const CFG_KEY = 'rshmod_config';
+let cfg = {};
+
+function $(s){return document.querySelector(s);}
+function $$(s){return document.querySelectorAll(s);}
+
+function toast(msg,ok=true){
+  const t=$('#toast');t.textContent=msg;t.style.background=ok?'#3ddc97':'#ff6b6b';t.style.color='#111';
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+async function bridge(cmd,payload){
+  // 优先调用原生 WebView 桥（管理端注入），否则降级到 CLI
+  if(window.AndroidBridge && window.AndroidBridge[cmd]){
+    return JSON.parse(window.AndroidBridge[cmd](payload?JSON.stringify(payload):''));
+  }
+  // 降级：通过 ADB/root 环境执行 rshmod_cli.sh（受控环境）
+  if(cmd==='read'){ try{return JSON.parse((await fetch('/api/read')).text())}catch(e){return null} }
+  return null;
+}
+
+async function loadConfig(){
+  const remote = await bridge('read');
+  cfg = remote && (remote.global!==undefined||remote.props) ? remote : {};
+  fillForm();
+  stat('配置已载入');
+}
+
+function fillForm(){
+  if(!cfg.props)cfg.props={}; if(!cfg.ids)cfg.ids={}; if(!cfg.wifi)cfg.wifi={};
+  if(!cfg.bluetooth)cfg.bluetooth={}; if(!cfg.operator)cfg.operator={};
+  if(!cfg.geo)cfg.geo={}; if(!cfg.switch)cfg.switch={};
+
+  $$('[data-k]').forEach(i=>i.value=cfg.props[i.dataset.k]||'');
+  $$('[data-id]').forEach(i=>i.value=cfg.ids[i.dataset.id]||'');
+  $$('[data-wifi]').forEach(i=>i.value=cfg.wifi[i.dataset.wifi]||'');
+  $$('[data-bt]').forEach(i=>i.value=cfg.bluetooth[i.dataset.bt]||'');
+  $$('[data-op]').forEach(i=>i.value=cfg.operator[i.dataset.op]||'');
+  $$('[data-geo]').forEach(i=>i.value=cfg.geo[i.dataset.geo]||'');
+  $$('[data-sw]').forEach(i=>i.checked=!!cfg.switch[i.dataset.sw]);
+  $('#global').checked=!!cfg.global;
+  // 预设一些常用机型供选择（可扩展）
+  renderScopes();
+}
+
+function collect(){
+  cfg.global=$('#global').checked;
+  $$('[data-k]').forEach(i=>cfg.props[i.dataset.k]=i.value);
+  $$('[data-id]').forEach(i=>cfg.ids[i.dataset.id]=i.value);
+  $$('[data-wifi]').forEach(i=>cfg.wifi[i.dataset.wifi]=i.value);
+  $$('[data-bt]').forEach(i=>cfg.bluetooth[i.dataset.bt]=i.value);
+  $$('[data-op]').forEach(i=>cfg.operator[i.dataset.op]=i.value);
+  $$('[data-geo]').forEach(i=>cfg.geo[i.dataset.geo]=parseFloat(i.value)||0);
+  $$('[data-sw]').forEach(i=>cfg.switch[i.dataset.sw]=i.checked);
+  // 清理空值
+  ['props','ids','wifi','bluetooth','operator'].forEach(s=>{
+    for(const k in cfg[s]) if(!cfg[s][k]) delete cfg[s][k];
+  });
+  for(const k in cfg.geo) if(!cfg.geo[k]) delete cfg.geo[k];
+  if(!cfg.scopes)cfg.scopes=[];
+  return cfg;
+}
+
+async function saveConfig(){
+  collect();
+  const saved = await bridge('set', cfg);
+  toast('配置已保存并应用');
+  $('#save-hint').textContent='下次启动目标应用时生效（Zygisk 注入）';
+}
+
+function addScope(){
+  const v=$('#scope-input').value.trim(); if(!v)return;
+  if(!cfg.scopes)cfg.scopes=[];
+  if(!cfg.scopes.includes(v))cfg.scopes.push(v);
+  $('#scope-input').value='';renderScopes();
+}
+function rmScope(i){cfg.scopes.splice(i,1);renderScopes();}
+function renderScopes(){
+  const el=$('#scope-list'); el.innerHTML='';
+  (cfg.scopes||[]).forEach((s,i)=>{
+    const d=document.createElement('div');
+    d.className='row';
+    d.innerHTML=`<code style="color:var(--txt)">${s}</code>
+      <button class="btn-ghost" onclick="rmScope(${i})">移除</button>`;
+    el.appendChild(d);
+  });
+  if(!cfg.scopes||!cfg.scopes.length) el.innerHTML='<small style="color:var(--sub)">未添加指定应用（需开启全局或添加包名）</small>';
+}
+
+async function loadInfo(){
+  const info = await bridge('info');
+  $('#info-box').textContent = info || '无法获取（非 root 环境）';
+}
+
+function stat(t){$('#stat').textContent=t;}
+
+// Tab 切换
+$$('#tabs button').forEach(b=>b.onclick=()=>{
+  $$('#tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+  $$('.wrap > section').forEach(s=>s.classList.add('hidden'));
+  $('#tab-'+b.dataset.tab).classList.remove('hidden');
+});
+
+// 初始化
+loadConfig();
+</script>
+</body>
+</html>

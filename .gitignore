@@ -1,0 +1,11 @@
+# 构建产物
+out/
+*.o
+*.class
+*.so
+
+# 系统/编辑器
+.DS_Store
+*.swp
+.idea/
+.vscode/
