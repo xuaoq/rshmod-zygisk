@@ -1,7 +1,5 @@
 /*
- * RshMod Zygisk 模块核心
- * 在 Zygote preAppSpecialize 阶段识别目标应用进程，
- * 根据配置决策生效范围（全局 / 指定 APP），注入 Java 运行时并挂 native hook。
+ * RshMod Zygisk 模块核心 (standard Zygisk API)
  */
 #include <android/log.h>
 #include <sys/system_properties.h>
@@ -58,40 +56,63 @@ static bool isInScope(const std::string& proc, const std::string& pkg) {
     return false;
 }
 
-//------------------------------------------------------------------------------
-// Native 层 Hook：__system_property_get
-//------------------------------------------------------------------------------
+static int (*realPropGet)(const char*, char*) = nullptr;
+static int propGetHandler(const char* name, char* value) {
+    if (!name || !value) return -1;
+    {
+        std::lock_guard<std::mutex> lk(g_cfgMutex);
+        std::string v = g_config.lookupProp(name);
+        if (!v.empty()) {
+            if (value) strcpy(value, v.c_str());
+            return (int)v.size();
+        }
+    }
+    if (realPropGet) return realPropGet(name, value);
+    return __system_property_get(name, value);
+}
+
 class RshMod : public zygisk::ModuleBase {
 public:
-    void onLoad(Api* api, JNIEnv* env) override {
+    explicit RshMod(Api* api) : api(api) {
+        LOGI("RshMod constructed");
+    }
+
+    void onLoad(Api* api) override {
         this->api = api;
-        this->env = env;
         std::lock_guard<std::mutex> lk(g_cfgMutex);
         if (!g_configLoaded) loadConfigLocked();
-        LOGI("onLoad, scopes=%zu, global=%d", g_config.scopes.size(),
-             (int)g_config.enableGlobal);
+        LOGI("onLoad, scopes=%zu, global=%d", g_config.scopes.size(), (int)g_config.enableGlobal);
     }
 
     void preAppSpecialize(AppSpecializeArgs* args) override {
         if (args == nullptr) return;
         std::string proc, pkg;
-        if (args->nice_name && env) {
-            const char* s = env->GetStringUTFChars(*args->nice_name, nullptr);
-            if (s) { proc = s; env->ReleaseStringUTFChars(*args->nice_name, s); }
+        if (args->nice_name) {
+            JNIEnv* env = getEnv();
+            if (env) {
+                const char* s = env->GetStringUTFChars(*args->nice_name, nullptr);
+                if (s) { proc = s; env->ReleaseStringUTFChars(*args->nice_name, s); }
+            }
         }
-        if (args->app_data_dir && env) {
-            const char* d = env->GetStringUTFChars(*args->app_data_dir, nullptr);
-            if (d) {
-                pkg = d;
-                env->ReleaseStringUTFChars(*args->app_data_dir, d);
-                size_t pos = pkg.rfind('/');
-                if (pos != std::string::npos) pkg = pkg.substr(pos + 1);
+        if (args->app_data_dir) {
+            JNIEnv* env = getEnv();
+            if (env) {
+                const char* d = env->GetStringUTFChars(*args->app_data_dir, nullptr);
+                if (d) {
+                    pkg = d;
+                    env->ReleaseStringUTFChars(*args->app_data_dir, d);
+                    size_t pos = pkg.rfind('/');
+                    if (pos != std::string::npos) pkg = pkg.substr(pos + 1);
+                }
             }
         }
         if (isInScope(proc, pkg)) {
             LOGI("target app: proc=%s pkg=%s", proc.c_str(), pkg.c_str());
-            injectJavaRuntime(proc.c_str(), pkg.c_str());
             hookNativeProp();
+            if (api) {
+                jclass cls = api->loadDex(kRuntimeDex);
+                if (cls) LOGI("rshmod_rt.dex loaded");
+            }
         } else {
             LOGD("skip: proc=%s", proc.c_str());
         }
@@ -102,52 +123,27 @@ public:
     void postServerSpecialize(const ServerSpecializeArgs* args) override {}
 
 private:
-    Api* api;
-    JNIEnv* env;
+    Api* api = nullptr;
 
-    // hook __system_property_get（经宿主 pltHook），命中伪装键则覆盖
-    static int propGetHandler(const char* name, char* value) {
-        if (!name || !value) return -1;
-        {
-            std::lock_guard<std::mutex> lk(g_cfgMutex);
-            std::string v = g_config.lookupProp(name);
-            if (!v.empty()) {
-                strcpy(value, v.c_str());
-                return (int)v.size();
-            }
-        }
-        // 走真实函数（宿主解析保存），避免 self-recursion
-        if (realPropGet) return realPropGet(name, value);
-        return __system_property_get(name, value);
+    JNIEnv* getEnv() {
+        if (api == nullptr) return nullptr;
+        JavaVM* vm = api->getJavaVM();
+        if (vm == nullptr) return nullptr;
+        JNIEnv* env = nullptr;
+        vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+        if (env == nullptr) vm->AttachCurrentThread(&env, nullptr);
+        return env;
     }
 
     void hookNativeProp() {
-        realPropGet = nullptr;
         if (api) {
-            // 宿主提供真实 __system_property_get 符号地址
             realPropGet = (int(*)(const char*, char*))api->getSym("__system_property_get");
             if (realPropGet) {
                 LOGI("hookNativeProp: __system_property_get @ %p", (void*)realPropGet);
-                // 生产环境启用：
-                //   api->pltHook("__system_property_get", (void*)propGetHandler);
             }
         }
     }
-
-    // 真实 __system_property_get（宿主解析保存，避免递归）
-    static int (*realPropGet)(const char*, char*);
-
-    void injectJavaRuntime(const char* proc, const char* pkg) {
-        (void)proc; (void)pkg;
-        // 通过宿主 API 在目标进程注入 dex：
-        //   jclass rtClass = api->loadDex(kRuntimeDex);
-        //   然后反射找到 com.zennolab.zennodroid.rt.RshRuntime 并调用静态 init()
-        // 宿主核对加载路径 /data/adb/rshmod/rshmod_rt.dex
-        LOGI("injectJavaRuntime ready: %s" , kRuntimeDex);
-    }
 };
 
-// 类外定义静态成员（避免链接错误）
 int (*RshMod::realPropGet)(const char*, char*) = nullptr;
-
 REGISTER_ZYGISK_MODULE(RshMod)
