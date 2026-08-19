@@ -145,5 +145,4 @@ private:
     }
 };
 
-int (*RshMod::realPropGet)(const char*, char*) = nullptr;
 REGISTER_ZYGISK_MODULE(RshMod)
